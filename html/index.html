@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Photos</title>
+    <style>
+      body {
+	  width: 100%;
+	  height: 100vh;
+	  margin: 0;
+	  padding: 0;
+	  background: black;
+	  color: white;
+      }
+      #media {
+	  width: 100%;
+	  height: 100vh;
+	  background-size: cover;
+	  background-position: center;
+      }
+    </style>
+
+    <script>
+
+      function refreshMedia() {
+	  const rq = new XMLHttpRequest();
+
+	  function load() {
+	      const info = JSON.parse(rq.responseText);
+	      const med = document.getElementById("media");
+	      med.style.backgroundImage = `url(${info.path})`;
+
+	      setTimeout(refreshMedia, 60 * 1000);
+	  }
+
+	  rq.addEventListener("load", load);
+	  rq.open("GET", "/next");
+	  rq.send();
+      }
+
+      window.onload = refreshMedia;
+    </script>
+  </head>
+
+  <body>
+
+      <div id="media">&nbsp;</div>
+
+  </body>
+</html>
+
