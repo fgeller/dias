@@ -3,30 +3,80 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/disintegration/imaging"
+	"github.com/rwcarlsen/goexif/exif"
 )
 
 func fail(err error) {
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }
 
 type response struct {
-	Path string `json:"path"`
-	Type string `json:"type"`
+	Path string    `json:"path"`
+	Type string    `json:"type"`
+	Meta *metaData `json:"meta"`
+}
+
+type metaData struct {
+	Time string `json:"time"`
+}
+
+func resetNext(path string) string {
+	f, err := os.Open(path)
+	fail(err)
+
+	i, err := imaging.Decode(f, imaging.AutoOrientation(true))
+	fail(err)
+
+	err = imaging.Save(i, "html/next.jpg")
+	fail(err)
+
+	return fmt.Sprintf("/next.jpg?t=%v", time.Now().Unix())
+}
+
+func readExif(path string) *metaData {
+	f, err := os.Open(path)
+	defer f.Close()
+	fail(err)
+
+	x, err := exif.Decode(f)
+	if err != nil {
+		log.Printf("failed to decode exif in %#v: %v", path, err)
+		return nil
+	}
+
+	result := &metaData{}
+
+	dt, err := x.DateTime()
+	if err != nil {
+		log.Printf("could not find datetime for %#v: %v", path, err)
+	} else {
+		result.Time = dt.Format(time.RFC822)
+	}
+
+	return result
 }
 
 func Next(w http.ResponseWriter, r *http.Request) {
-	mf := fmt.Sprintf("/media/%s", randomString(mediaFiles))
-	fmt.Printf(">> next: %v\n", mf)
+	fn := randomString(mediaFiles)
+	pth := fmt.Sprintf("html/media/%v", fn)
+	x := readExif(pth)
+	url := resetNext(pth)
+
+	log.Printf("fn %v datetime %s\n", fn, x.Time)
+
 	enc := json.NewEncoder(w)
-	err := enc.Encode(response{Path: mf, Type: "Photo"})
+	err := enc.Encode(response{Path: url, Type: "Photo", Meta: x})
 	fail(err)
 }
 
@@ -54,7 +104,7 @@ func main() {
 	var err error
 	mediaFiles, err = findMedia()
 	fail(err)
-	fmt.Printf("found %v media files.", len(mediaFiles))
+	fmt.Printf("found %v media files.\n", len(mediaFiles))
 	http.Handle("/", http.FileServer(http.Dir("html/")))
 	http.HandleFunc("/next", Next)
 	fail(http.ListenAndServe(":8080", nil))
