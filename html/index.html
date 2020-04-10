@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Photos</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500&display=swap" rel="stylesheet"> 
     <style>
       body {
 	  width: 100%;
@@ -19,15 +20,21 @@
 	  background-size: contain;
 	  background-position: center;
 	  background-repeat: no-repeat;
-	  display: flex;
-	  justify-content: right;
-	  align-items: end;
       }
       #info {
-	  padding: 1rem;
+	  padding: 0.5rem;
+	  margin: 0.5rem;
 	  background: rgba(0,0,0,0.8);
-	  font-family: sans-serif;
+	  font-family: 'Montserrat', sans-serif;
 	  font-size: 2rem;
+	  border-radius: 0.5rem;
+	  display: flex;
+	  position: absolute;
+	  bottom: 0;
+	  left: 0;
+      }
+      #location {
+	  margin-left: 1rem;
       }
     </style>
 
@@ -41,10 +48,13 @@
 	      const med = document.getElementById("media");
 	      med.style.backgroundImage = `url(${resp.path})`;
 
-	      const info = document.getElementById("info");
-	      info.textContent = resp.meta.time;
+	      const dt = document.getElementById("datetime");
+	      dt.textContent = `${resp.meta.time}`;
 
-	      setTimeout(refreshMedia, 60 * 1000);
+	      const loc = document.getElementById("location");
+	      loc.textContent = `${resp.meta.location.city} ${resp.meta.location.country}`;
+
+	      setTimeout(refreshMedia, 5 * 1000);
 	  }
 
 	  rq.addEventListener("load", load);
@@ -59,7 +69,10 @@
   <body>
 
     <div id="media">
-      <div id="info"></div>
+      <div id="info">
+	<div id="datetime"></div>
+	<div id="location"></div>
+      </div>
     </div>
 
   </body>

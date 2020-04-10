@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/disintegration/imaging"
 	"github.com/rwcarlsen/goexif/exif"
 )
@@ -28,7 +29,13 @@ type response struct {
 }
 
 type metaData struct {
-	Time string `json:"time"`
+	Time     string   `json:"time"`
+	Location location `json:"location"`
+}
+
+type location struct {
+	City    string `json:"city"`
+	Country string `json:"country"`
 }
 
 func resetNext(path string) string {
@@ -44,7 +51,7 @@ func resetNext(path string) string {
 	return fmt.Sprintf("/next.jpg?t=%v", time.Now().Unix())
 }
 
-func readExif(path string) metaData {
+func readMetaData(path string) metaData {
 	result := metaData{}
 
 	f, err := os.Open(path)
@@ -67,17 +74,70 @@ func readExif(path string) metaData {
 		result.Time = dt.Format("2006-01-02")
 	}
 
+	lat, lon, err := x.LatLong()
+	if err == nil {
+		url := fmt.Sprintf("https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=%v&lon=%v", lat, lon)
+		fmt.Printf(">> url %#v\n", url)
+		resp, err := http.Get(url)
+		fail(err)
+
+		defer resp.Body.Close()
+		var loc nominatimResponse
+		err = json.NewDecoder(resp.Body).Decode(&loc)
+		fail(err)
+
+		spew.Dump(loc)
+
+		result.Location = location{City: loc.Address.City, Country: loc.Address.Country}
+		if result.Location.City == "" {
+			result.Location.City = loc.Address.Village
+		}
+
+	} else {
+		log.Printf(">> no GPS data for %s, err: %v\n", path, err)
+	}
+
 	return result
+}
+
+type nominatimResponse struct {
+	PlaceID     int              `json:"place_id"`
+	Licence     string           `json:"licence"`
+	OSMType     string           `json:"osm_type"`
+	OSMID       int              `json:"osm_id"`
+	Lat         string           `json:"lat"`
+	Lon         string           `json:"lon"`
+	PlaceRank   int              `json:"place_rank"`
+	Category    string           `json:"category"`
+	Type        string           `json:"type"`
+	Importance  float64          `json:"importance"`
+	AddressType string           `json:"addresstype"`
+	Name        string           `json:"name"`
+	DisplayName string           `json:"display_name"`
+	Address     nominatimAddress `json:"address"`
+	BoundingBox []string         `json:"boundingbox"`
+}
+
+type nominatimAddress struct {
+	Path        string `json:"path"`
+	Suburb      string `json:"suburb"`
+	Village     string `json:"village"`
+	City        string `json:"city"`
+	County      string `json:"county"`
+	State       string `json:"state"`
+	PostCode    string `json:"postcode"`
+	Country     string `json:"country"`
+	CountryCode string `json:"country_code"`
 }
 
 func Next(w http.ResponseWriter, r *http.Request) {
 	fn := randomString(mediaFiles)
 	pth := fmt.Sprintf("html/media/%v", fn)
-	x := readExif(pth)
+	md := readMetaData(pth)
 	url := resetNext(pth)
 
-	resp := response{Path: url, Type: "Photo", Meta: x}
-	log.Printf("%#v\n", resp)
+	resp := response{Path: url, Type: "Photo", Meta: md}
+	spew.Dump(resp)
 
 	enc := json.NewEncoder(w)
 	err := enc.Encode(resp)
