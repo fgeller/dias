@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"image"
 	"log"
 	"math/rand"
 	"net/http"
@@ -13,8 +15,11 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/disintegration/imaging"
+	"github.com/jdeng/goheif"
 	"github.com/rwcarlsen/goexif/exif"
 )
+
+var mediaFiles []string
 
 func fail(err error) {
 	if err != nil {
@@ -31,6 +36,8 @@ type response struct {
 type metaData struct {
 	Time     string   `json:"time"`
 	Location location `json:"location"`
+
+	exif *exif.Exif
 }
 
 type location struct {
@@ -38,17 +45,57 @@ type location struct {
 	Country string `json:"country"`
 }
 
-func resetNext(path string) string {
+// inline disintegration/imaging to support heif images
+func fixOrientation(img image.Image, orientation string) image.Image {
+	switch orientation {
+	case "1":
+	case "2":
+		return imaging.FlipH(img)
+	case "3":
+		return imaging.Rotate180(img)
+	case "4":
+		return imaging.FlipV(img)
+	case "5":
+		return imaging.Transpose(img)
+	case "6":
+		return imaging.Rotate270(img)
+	case "7":
+		return imaging.Transverse(img)
+	case "8":
+		return imaging.Rotate90(img)
+	}
+	return img
+}
+
+func refreshNext(path string, md metaData) string {
 	f, err := os.Open(path)
 	fail(err)
 
-	i, err := imaging.Decode(f, imaging.AutoOrientation(true))
+	i, err := imaging.Decode(f)
 	fail(err)
+
+	tg, err := md.exif.Get(exif.Orientation)
+	if err != nil {
+		log.Printf("failed to read orientation for %#v: %v", path, err)
+	} else {
+		i = fixOrientation(i, tg.String())
+	}
 
 	err = imaging.Save(i, "html/next.jpg")
 	fail(err)
 
 	return fmt.Sprintf("/next.jpg?t=%v", time.Now().Unix())
+}
+
+func isHEIF(path string) bool {
+	ext := strings.ToLower(filepath.Ext(path))
+
+	switch ext {
+	case ".heic":
+		return true
+	default:
+		return false
+	}
 }
 
 func readMetaData(path string) metaData {
@@ -58,13 +105,20 @@ func readMetaData(path string) metaData {
 	defer f.Close()
 	fail(err)
 
-	x, err := exif.Decode(f)
+	if isHEIF(path) {
+		buf, err := goheif.ExtractExif(f)
+		fail(err)
+		result.exif, err = exif.Decode(bytes.NewReader(buf))
+	} else {
+		result.exif, err = exif.Decode(f)
+	}
+
 	if err != nil {
 		log.Printf("failed to decode exif in %#v: %v", path, err)
 		return result
 	}
 
-	dt, err := x.DateTime()
+	dt, err := result.exif.DateTime()
 	if err != nil {
 		log.Printf("could not find exif datetime for %#v: %v", path, err)
 		fi, err := f.Stat()
@@ -74,7 +128,7 @@ func readMetaData(path string) metaData {
 		result.Time = dt.Format("2006-01-02")
 	}
 
-	lat, lon, err := x.LatLong()
+	lat, lon, err := result.exif.LatLong()
 	if err == nil {
 		url := fmt.Sprintf("https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=%v&lon=%v", lat, lon)
 		fmt.Printf(">> url %#v\n", url)
@@ -100,41 +154,12 @@ func readMetaData(path string) metaData {
 	return result
 }
 
-type nominatimResponse struct {
-	PlaceID     int              `json:"place_id"`
-	Licence     string           `json:"licence"`
-	OSMType     string           `json:"osm_type"`
-	OSMID       int              `json:"osm_id"`
-	Lat         string           `json:"lat"`
-	Lon         string           `json:"lon"`
-	PlaceRank   int              `json:"place_rank"`
-	Category    string           `json:"category"`
-	Type        string           `json:"type"`
-	Importance  float64          `json:"importance"`
-	AddressType string           `json:"addresstype"`
-	Name        string           `json:"name"`
-	DisplayName string           `json:"display_name"`
-	Address     nominatimAddress `json:"address"`
-	BoundingBox []string         `json:"boundingbox"`
-}
-
-type nominatimAddress struct {
-	Path        string `json:"path"`
-	Suburb      string `json:"suburb"`
-	Village     string `json:"village"`
-	City        string `json:"city"`
-	County      string `json:"county"`
-	State       string `json:"state"`
-	PostCode    string `json:"postcode"`
-	Country     string `json:"country"`
-	CountryCode string `json:"country_code"`
-}
-
 func Next(w http.ResponseWriter, r *http.Request) {
 	fn := randomString(mediaFiles)
+	fmt.Printf("%v\n", fn)
 	pth := fmt.Sprintf("html/media/%v", fn)
 	md := readMetaData(pth)
-	url := resetNext(pth)
+	url := refreshNext(pth, md)
 
 	resp := response{Path: url, Type: "Photo", Meta: md}
 	spew.Dump(resp)
@@ -153,7 +178,7 @@ func findMedia() ([]string, error) {
 	result := []string{}
 	walker := func(pth string, info os.FileInfo, err error) error {
 		switch strings.ToLower(filepath.Ext(info.Name())) {
-		case ".jpg":
+		case ".heic", ".jpg", ".jpeg":
 			result = append(result, info.Name())
 		}
 		return err
@@ -161,8 +186,6 @@ func findMedia() ([]string, error) {
 	err := filepath.Walk("html/media", walker)
 	return result, err
 }
-
-var mediaFiles []string
 
 func main() {
 	var err error
