@@ -14,12 +14,14 @@
 	  background: black;
 	  color: white;
       }
+      #container {
+	  width: 100%;
+	  height: 100%;
+      }
       #media {
 	  width: 100%;
-	  height: 100vh;
-	  background-size: contain;
-	  background-position: center;
-	  background-repeat: no-repeat;
+	  height: 100%;
+	  object-fit: contain;
       }
       #info {
 	  padding: 0.5rem;
@@ -45,8 +47,22 @@
 
 	  function load() {
 	      const resp = JSON.parse(rq.responseText);
-	      const med = document.getElementById("media");
-	      med.style.backgroundImage = `url(${resp.path})`;
+	      const container = document.getElementById("container");
+
+	      let old = document.getElementById("media");
+	      if (old != null) {
+		  old.remove();
+	      }
+
+	      if (resp.type == "Photo") {
+		  const img = document.createElement("img");
+		  img.id = "media";
+		  img.src = resp.path;
+		  container.appendChild(img)
+	      } else {
+		  console.log("type not supported", resp.type)
+	      }
+	      // med.style.backgroundImage = `url(${resp.path})`;
 
 	      const dt = document.getElementById("datetime");
 	      dt.textContent = `${resp.meta.time}`;
@@ -76,7 +92,7 @@
 
   <body>
 
-    <div id="media">
+    <div id="container">
       <div id="info">
 	<div id="datetime"></div>
 	<div id="location"></div>
