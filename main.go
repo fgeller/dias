@@ -22,9 +22,9 @@ func fail(err error) {
 }
 
 type response struct {
-	Path string    `json:"path"`
-	Type string    `json:"type"`
-	Meta *metaData `json:"meta"`
+	Path string   `json:"path"`
+	Type string   `json:"type"`
+	Meta metaData `json:"meta"`
 }
 
 type metaData struct {
@@ -44,7 +44,9 @@ func resetNext(path string) string {
 	return fmt.Sprintf("/next.jpg?t=%v", time.Now().Unix())
 }
 
-func readExif(path string) *metaData {
+func readExif(path string) metaData {
+	result := metaData{}
+
 	f, err := os.Open(path)
 	defer f.Close()
 	fail(err)
@@ -52,16 +54,17 @@ func readExif(path string) *metaData {
 	x, err := exif.Decode(f)
 	if err != nil {
 		log.Printf("failed to decode exif in %#v: %v", path, err)
-		return nil
+		return result
 	}
-
-	result := &metaData{}
 
 	dt, err := x.DateTime()
 	if err != nil {
-		log.Printf("could not find datetime for %#v: %v", path, err)
+		log.Printf("could not find exif datetime for %#v: %v", path, err)
+		fi, err := f.Stat()
+		fail(err)
+		result.Time = fi.ModTime().Format("2006-01-02")
 	} else {
-		result.Time = dt.Format(time.RFC822)
+		result.Time = dt.Format("2006-01-02")
 	}
 
 	return result
@@ -73,10 +76,11 @@ func Next(w http.ResponseWriter, r *http.Request) {
 	x := readExif(pth)
 	url := resetNext(pth)
 
-	log.Printf("fn %v datetime %s\n", fn, x.Time)
+	resp := response{Path: url, Type: "Photo", Meta: x}
+	log.Printf("%#v\n", resp)
 
 	enc := json.NewEncoder(w)
-	err := enc.Encode(response{Path: url, Type: "Photo", Meta: x})
+	err := enc.Encode(resp)
 	fail(err)
 }
 
