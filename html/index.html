@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Photos</title>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500&display=swap" rel="stylesheet"> 
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500&display=swap" rel="stylesheet">
     <style>
       body {
 	  width: 100%;
@@ -54,7 +54,15 @@
 	      const loc = document.getElementById("location");
 	      loc.textContent = `${resp.meta.location.city} ${resp.meta.location.country}`;
 
-	      setTimeout(refreshMedia, 5 * 1000);
+	      let interval = 60;
+
+	      const url = new URL(window.location.href);
+	      const urlParam = url.searchParams.get("interval")
+	      if (urlParam !== null && urlParam !== "") {
+		  interval = parseInt(urlParam)
+	      }
+
+	      setTimeout(refreshMedia, interval * 1000);
 	  }
 
 	  rq.addEventListener("load", load);
@@ -77,4 +85,3 @@
 
   </body>
 </html>
-
