@@ -62,13 +62,19 @@
 	      } else {
 		  console.log("type not supported", resp.type)
 	      }
-	      // med.style.backgroundImage = `url(${resp.path})`;
 
 	      const dt = document.getElementById("datetime");
 	      dt.textContent = `${resp.meta.time}`;
 
 	      const loc = document.getElementById("location");
-	      loc.textContent = `${resp.meta.location.city} ${resp.meta.location.country}`;
+	      loc.textContent = "";
+	      if (resp.meta.location.village !== "") {
+		  loc.textContent = resp.meta.location.village
+	      } else if (resp.meta.location.city !== "") {
+		  loc.textContent = resp.meta.location.city
+	      } else if (resp.meta.location.country !== "") {
+		  loc.textContent = resp.meta.location.country
+	      }
 
 	      let interval = 60;
 

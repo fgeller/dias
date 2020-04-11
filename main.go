@@ -41,6 +41,7 @@ type metaData struct {
 }
 
 type location struct {
+	Village string `json:"village"`
 	City    string `json:"city"`
 	Country string `json:"country"`
 }
@@ -142,9 +143,10 @@ func readMetaData(path string) metaData {
 
 		spew.Dump(loc)
 
-		result.Location = location{City: loc.Address.City, Country: loc.Address.Country}
-		if result.Location.City == "" {
-			result.Location.City = loc.Address.Village
+		result.Location = location{
+			Village: loc.Address.Village,
+			City:    loc.Address.City,
+			Country: loc.Address.Country,
 		}
 
 	} else {
@@ -192,7 +194,9 @@ func main() {
 	mediaFiles, err = findMedia()
 	fail(err)
 	fmt.Printf("found %v media files.\n", len(mediaFiles))
+
 	http.Handle("/", http.FileServer(http.Dir("html/")))
 	http.HandleFunc("/next", Next)
+
 	fail(http.ListenAndServe(":8080", nil))
 }
