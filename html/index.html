@@ -75,16 +75,6 @@
 	      } else if (resp.meta.location.country !== "") {
 		  loc.textContent = resp.meta.location.country
 	      }
-
-	      let interval = 60;
-
-	      const url = new URL(window.location.href);
-	      const urlParam = url.searchParams.get("interval")
-	      if (urlParam !== null && urlParam !== "") {
-		  interval = parseInt(urlParam)
-	      }
-
-	      setTimeout(refreshMedia, interval * 1000);
 	  }
 
 	  rq.addEventListener("load", load);
@@ -92,7 +82,19 @@
 	  rq.send();
       }
 
-      window.onload = refreshMedia;
+      window.onload = function() {
+	  refreshMedia();
+
+          let interval = 60;
+
+          const url = new URL(window.location.href);
+          const urlParam = url.searchParams.get("interval")
+          if (urlParam !== null && urlParam !== "") {
+              interval = parseInt(urlParam)
+	  }
+
+	  setInterval(refreshMedia, interval * 1000);
+      };
     </script>
   </head>
 
