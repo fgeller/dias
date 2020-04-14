@@ -207,7 +207,7 @@ func readPhotoMetaData(path string) metaData {
 		}
 
 	} else {
-		log.Printf(">> no GPS data for %s, err: %v\n", path, err)
+		log.Printf("found no gps data for %s, err: %v\n", path, err)
 	}
 
 	return result
