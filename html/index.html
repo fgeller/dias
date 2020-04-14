@@ -96,18 +96,27 @@
 	  rq.send();
       }
 
-      window.onload = function() {
-	  refreshMedia();
+      function reloadPage() {
+	  window.location.reload(true);
+      }
 
-          let interval = 60;
-
+      function readInterval() {
           const url = new URL(window.location.href);
           const urlParam = url.searchParams.get("interval")
           if (urlParam !== null && urlParam !== "") {
-              interval = parseInt(urlParam)
+              return parseInt(urlParam)
+	  } else {
+	      return 60
 	  }
+      }
 
+      window.onload = function() {
+	  refreshMedia();
+
+          const interval = readInterval();
 	  setInterval(refreshMedia, interval * 1000);
+
+	  setInterval(reloadPage, 60 * 60 * 1000);
       };
     </script>
   </head>
