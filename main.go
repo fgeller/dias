@@ -76,7 +76,7 @@ func refreshNextVideo(path string, md metaData) string {
 	err = ioutil.WriteFile(target, buf, 0755)
 	fail(err)
 
-	return fmt.Sprintf("/next.mov?t=%v", time.Now().Unix())
+	return "/next.mov"
 }
 
 func refreshNextJPG(path string, md metaData) string {
@@ -96,9 +96,9 @@ func refreshNextJPG(path string, md metaData) string {
 	err = imaging.Save(i, "html/next.jpg")
 	fail(err)
 
-	return fmt.Sprintf("/next.jpg?t=%v", time.Now().Unix())
-
+	return "/next.jpg"
 }
+
 func refreshNextPNG(path string, md metaData) string {
 	f, err := os.Open(path)
 	fail(err)
@@ -109,7 +109,7 @@ func refreshNextPNG(path string, md metaData) string {
 	err = imaging.Save(i, "html/next.png")
 	fail(err)
 
-	return fmt.Sprintf("/next.png?t=%v", time.Now().Unix())
+	return "/next.png"
 }
 
 func refreshNextPhoto(path string, md metaData) string {

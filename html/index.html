@@ -63,7 +63,7 @@
 		  newMedia.onload = elementSwitch;
 		  newMedia.loading = "eager";
 		  newMedia.id = "media";
-		  newMedia.src = resp.path;
+		  newMedia.src = `${resp.path}?anti-cache=${new Date().getTime()}`;
 	      } else if (resp.type == "Video") {
 		  newMedia = document.createElement("video");
 		  newMedia.onload = elementSwitch;
