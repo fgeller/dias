@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
@@ -68,7 +69,18 @@ func fixOrientation(img image.Image, orientation string) image.Image {
 	return img
 }
 
-func refreshNext(path string, md metaData) string {
+func refreshNextVideo(path string, md metaData) string {
+	buf, err := ioutil.ReadFile(path)
+	fail(err)
+
+	target := filepath.Join("html", "next.mov")
+	err = ioutil.WriteFile(target, buf, 0755)
+	fail(err)
+
+	return fmt.Sprintf("/next.mov?t=%v", time.Now().Unix())
+}
+
+func refreshNextPhoto(path string, md metaData) string {
 	f, err := os.Open(path)
 	fail(err)
 
@@ -99,7 +111,33 @@ func isHEIF(path string) bool {
 	}
 }
 
-func readMetaData(path string) metaData {
+func isVideo(path string) bool {
+	ext := strings.ToLower(filepath.Ext(path))
+
+	switch ext {
+	case ".mov":
+		return true
+	default:
+		return false
+	}
+}
+
+func readVideoMetaData(path string) metaData {
+	result := metaData{}
+
+	f, err := os.Open(path)
+	defer f.Close()
+	fail(err)
+
+	fi, err := f.Stat()
+	fail(err)
+
+	result.Time = fi.ModTime().Format("2006-01-02")
+
+	return result
+}
+
+func readPhotoMetaData(path string) metaData {
 	result := metaData{}
 
 	f, err := os.Open(path)
@@ -158,13 +196,18 @@ func readMetaData(path string) metaData {
 
 func Next(w http.ResponseWriter, r *http.Request) {
 	fn := randomString(mediaFiles)
-	fmt.Printf("%v\n", fn)
 	pth := fmt.Sprintf("html/media/%v", fn)
-	md := readMetaData(pth)
-	url := refreshNext(pth, md)
+	var resp response
 
-	resp := response{Path: url, Type: "Photo", Meta: md}
-	spew.Dump(resp)
+	if isVideo(pth) {
+		resp.Type = "Video"
+		resp.Meta = readVideoMetaData(pth)
+		resp.Path = refreshNextVideo(pth, resp.Meta)
+	} else {
+		resp.Type = "Photo"
+		resp.Meta = readPhotoMetaData(pth)
+		resp.Path = refreshNextPhoto(pth, resp.Meta)
+	}
 
 	enc := json.NewEncoder(w)
 	err := enc.Encode(resp)
@@ -182,6 +225,9 @@ func findMedia() ([]string, error) {
 		switch strings.ToLower(filepath.Ext(info.Name())) {
 		case ".heic", ".jpg", ".jpeg":
 			result = append(result, info.Name())
+			// case ".mov":
+			// 	result = append(result, info.Name())
+			// TODO png
 		}
 		return err
 	}

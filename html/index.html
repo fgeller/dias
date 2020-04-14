@@ -59,12 +59,20 @@
 		  img.id = "media";
 		  img.src = resp.path;
 		  container.appendChild(img)
+	      } else if (resp.type == "Video") {
+		  const vid = document.createElement("video");
+		  vid.id = "media";
+		  vid.src = resp.path
+		  vid.autoplay = true;
+		  vid.loop = true;
+		  vid.playsinline = true;
+		  container.appendChild(vid)
 	      } else {
 		  console.log("type not supported", resp.type)
 	      }
 
 	      const dt = document.getElementById("datetime");
-	      dt.textContent = `${resp.meta.time}`;
+	      dt.textContent = resp.meta.time;
 
 	      const loc = document.getElementById("location");
 	      loc.textContent = "";
