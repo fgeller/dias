@@ -45,7 +45,7 @@
       function refreshMedia() {
 	  const rq = new XMLHttpRequest();
 
-	  function load() {
+	  function requestLoaded() {
 	      const resp = JSON.parse(rq.responseText);
 	      const container = document.getElementById("container");
 	      let newMedia;
@@ -56,6 +56,19 @@
 		      old.remove();
 		  }
 		  container.appendChild(newMedia)
+
+		  const dt = document.getElementById("datetime");
+		  dt.textContent = resp.meta.time;
+
+		  const loc = document.getElementById("location");
+		  loc.textContent = "";
+		  if (resp.meta.location.village !== "") {
+		      loc.textContent = resp.meta.location.village
+		  } else if (resp.meta.location.city !== "") {
+		      loc.textContent = resp.meta.location.city
+		  } else if (resp.meta.location.country !== "") {
+		      loc.textContent = resp.meta.location.country
+		  }
 	      }
 
 	      if (resp.type == "Photo") {
@@ -76,22 +89,9 @@
 		  console.log("type not supported", resp.type)
 		  return
 	      }
-
-	      const dt = document.getElementById("datetime");
-	      dt.textContent = resp.meta.time;
-
-	      const loc = document.getElementById("location");
-	      loc.textContent = "";
-	      if (resp.meta.location.village !== "") {
-		  loc.textContent = resp.meta.location.village
-	      } else if (resp.meta.location.city !== "") {
-		  loc.textContent = resp.meta.location.city
-	      } else if (resp.meta.location.country !== "") {
-		  loc.textContent = resp.meta.location.country
-	      }
 	  }
 
-	  rq.addEventListener("load", load);
+	  rq.addEventListener("load", requestLoaded);
 	  rq.open("GET", "/next");
 	  rq.send();
       }
