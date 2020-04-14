@@ -48,27 +48,33 @@
 	  function load() {
 	      const resp = JSON.parse(rq.responseText);
 	      const container = document.getElementById("container");
+	      let newMedia;
 
-	      let old = document.getElementById("media");
-	      if (old != null) {
-		  old.remove();
+	      function elementSwitch() {
+		  let old = document.getElementById("media");
+		  if (old != null) {
+		      old.remove();
+		  }
+		  container.appendChild(newMedia)
 	      }
 
 	      if (resp.type == "Photo") {
-		  const img = document.createElement("img");
-		  img.id = "media";
-		  img.src = resp.path;
-		  container.appendChild(img)
+		  newMedia = document.createElement("img");
+		  newMedia.onload = elementSwitch;
+		  newMedia.loading = "eager";
+		  newMedia.id = "media";
+		  newMedia.src = resp.path;
 	      } else if (resp.type == "Video") {
-		  const vid = document.createElement("video");
-		  vid.id = "media";
-		  vid.src = resp.path
-		  vid.autoplay = true;
-		  vid.loop = true;
-		  vid.playsinline = true;
-		  container.appendChild(vid)
+		  newMedia = document.createElement("video");
+		  newMedia.onload = elementSwitch;
+		  newMedia.id = "media";
+		  newMedia.src = resp.path
+		  newMedia.autoplay = true;
+		  newMedia.loop = true;
+		  newMedia.playsinline = true;
 	      } else {
 		  console.log("type not supported", resp.type)
+		  return
 	      }
 
 	      const dt = document.getElementById("datetime");
