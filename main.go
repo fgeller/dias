@@ -80,7 +80,7 @@ func refreshNextVideo(path string, md metaData) string {
 	return fmt.Sprintf("/next.mov?t=%v", time.Now().Unix())
 }
 
-func refreshNextPhoto(path string, md metaData) string {
+func refreshNextJPG(path string, md metaData) string {
 	f, err := os.Open(path)
 	fail(err)
 
@@ -98,6 +98,28 @@ func refreshNextPhoto(path string, md metaData) string {
 	fail(err)
 
 	return fmt.Sprintf("/next.jpg?t=%v", time.Now().Unix())
+
+}
+func refreshNextPNG(path string, md metaData) string {
+	f, err := os.Open(path)
+	fail(err)
+
+	i, err := imaging.Decode(f)
+	fail(err)
+
+	err = imaging.Save(i, "html/next.png")
+	fail(err)
+
+	return fmt.Sprintf("/next.png?t=%v", time.Now().Unix())
+}
+
+func refreshNextPhoto(path string, md metaData) string {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".png":
+		return refreshNextPNG(path, md)
+	default:
+		return refreshNextJPG(path, md)
+	}
 }
 
 func isHEIF(path string) bool {
@@ -153,7 +175,7 @@ func readPhotoMetaData(path string) metaData {
 	}
 
 	if err != nil {
-		log.Printf("failed to decode exif in %#v: %v", path, err)
+		log.Printf("warning: failed to decode exif in %#v: %v", path, err)
 		return result
 	}
 
@@ -170,7 +192,6 @@ func readPhotoMetaData(path string) metaData {
 	lat, lon, err := result.exif.LatLong()
 	if err == nil {
 		url := fmt.Sprintf("https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=%v&lon=%v", lat, lon)
-		fmt.Printf(">> url %#v\n", url)
 		resp, err := http.Get(url)
 		fail(err)
 
@@ -223,7 +244,7 @@ func findMedia() ([]string, error) {
 	result := []string{}
 	walker := func(pth string, info os.FileInfo, err error) error {
 		switch strings.ToLower(filepath.Ext(info.Name())) {
-		case ".heic", ".jpg", ".jpeg":
+		case ".heic", ".jpg", ".jpeg", ".png":
 			result = append(result, info.Name())
 			// case ".mov":
 			// 	result = append(result, info.Name())
@@ -239,10 +260,12 @@ func main() {
 	var err error
 	mediaFiles, err = findMedia()
 	fail(err)
-	fmt.Printf("found %v media files.\n", len(mediaFiles))
+	log.Printf("found %v media files.\n", len(mediaFiles))
 
 	http.Handle("/", http.FileServer(http.Dir("html/")))
 	http.HandleFunc("/next", Next)
 
-	fail(http.ListenAndServe(":8080", nil))
+	addr := ":8080"
+	log.Printf("starting server at %#v", addr)
+	log.Fatal(http.ListenAndServe(addr, nil))
 }
