@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/disintegration/imaging"
 	"github.com/jdeng/goheif"
 	"github.com/rwcarlsen/goexif/exif"
@@ -199,8 +198,7 @@ func readPhotoMetaData(path string) metaData {
 		var loc nominatimResponse
 		err = json.NewDecoder(resp.Body).Decode(&loc)
 		fail(err)
-
-		spew.Dump(loc)
+		log.Printf("location display name: %#v\n", loc.DisplayName)
 
 		result.Location = location{
 			Village: loc.Address.Village,
