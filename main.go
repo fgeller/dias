@@ -86,11 +86,13 @@ func refreshNextJPG(path string, md metaData) string {
 	i, err := imaging.Decode(f)
 	fail(err)
 
-	tg, err := md.exif.Get(exif.Orientation)
-	if err != nil {
-		log.Printf("failed to read orientation for %#v: %v", path, err)
-	} else {
-		i = fixOrientation(i, tg.String())
+	if md.exif != nil {
+		tg, err := md.exif.Get(exif.Orientation)
+		if err != nil {
+			log.Printf("failed to read orientation for %#v: %v", path, err)
+		} else {
+			i = fixOrientation(i, tg.String())
+		}
 	}
 
 	err = imaging.Save(i, "html/next.jpg")
