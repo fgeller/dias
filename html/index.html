@@ -42,62 +42,64 @@
 
     <script>
 
-      function refreshMedia() {
-	  const rq = new XMLHttpRequest();
-
-	  function requestLoaded() {
-	      const resp = JSON.parse(rq.responseText);
-	      const container = document.getElementById("container");
-	      let newMedia;
-
-	      function elementSwitch() {
-		  let old = document.getElementById("media");
-		  if (old != null) {
-		      old.remove();
-		  }
-		  container.appendChild(newMedia)
-
-		  const dt = document.getElementById("datetime");
-		  dt.textContent = resp.meta.time;
-
-		  const loc = document.getElementById("location");
-		  loc.textContent = "";
-		  if (resp.meta.location.village !== "") {
-		      loc.textContent = resp.meta.location.village
-		  } else if (resp.meta.location.city !== "") {
-		      loc.textContent = resp.meta.location.city
-		  } else if (resp.meta.location.country !== "") {
-		      loc.textContent = resp.meta.location.country
-		  }
-	      }
-
-	      if (resp.type == "Photo") {
-		  newMedia = document.createElement("img");
-		  newMedia.onload = elementSwitch;
-		  newMedia.loading = "eager";
-		  newMedia.id = "media";
-		  newMedia.src = `${resp.path}?anti-cache=${new Date().getTime()}`;
-	      } else if (resp.type == "Video") {
-		  newMedia = document.createElement("video");
-		  newMedia.onload = elementSwitch;
-		  newMedia.id = "media";
-		  newMedia.src = resp.path
-		  newMedia.autoplay = true;
-		  newMedia.loop = true;
-		  newMedia.playsinline = true;
-	      } else {
-		  console.log("type not supported", resp.type)
-		  return
-	      }
+      function elementSwitch(newMedia, resp) {
+	  const container = document.getElementById("container");
+	  let old = document.getElementById("media");
+	  if (old != null) {
+	      old.remove();
 	  }
+	  container.appendChild(newMedia)
 
-	  rq.addEventListener("load", requestLoaded);
-	  rq.open("GET", "/next");
-	  rq.send();
+	  const dt = document.getElementById("datetime");
+	  dt.textContent = resp.meta.time;
+
+	  const loc = document.getElementById("location");
+	  loc.textContent = "";
+	  if (resp.meta.location.village !== "") {
+	      loc.textContent = resp.meta.location.village
+	  } else if (resp.meta.location.city !== "") {
+	      loc.textContent = resp.meta.location.city
+	  } else if (resp.meta.location.country !== "") {
+	      loc.textContent = resp.meta.location.country
+	  }
       }
 
-      function reloadPage() {
-	  window.location.reload(true);
+      function callbackImageLoaded(newMedia, resp) {
+	  return function() { elementSwitch(newMedia, resp) }
+      }
+
+      function requestLoaded(rq) {
+	  const resp = JSON.parse(rq.responseText);
+	  let newMedia;
+
+	  if (resp.type == "Photo") {
+	      newMedia = document.createElement("img");
+	      newMedia.onload = callbackImageLoaded(newMedia, resp);
+	      newMedia.loading = "eager";
+	      newMedia.id = "media";
+	      newMedia.src = `${resp.path}?anti-cache=${new Date().getTime()}`;
+	  } else if (resp.type == "Video") {
+	      newMedia = document.createElement("video");
+	      newMedia.onload = callbackImageLoaded(newMedia, resp);
+	      newMedia.id = "media";
+	      newMedia.src = resp.path
+	      newMedia.autoplay = true;
+	      newMedia.loop = true;
+	      newMedia.playsinline = true;
+	  } else {
+	      console.log("type not supported", resp.type)
+	  }
+      }
+
+      function callbackRequestLoaded(rq) {
+	  return function() { requestLoaded(rq) }
+      }
+
+      function refreshMedia() {
+	  const rq = new XMLHttpRequest();
+	  rq.addEventListener("load", loadedCallback(rq));
+	  rq.open("GET", "/next");
+	  rq.send();
       }
 
       function readInterval() {
@@ -112,23 +114,18 @@
 
       window.onload = function() {
 	  refreshMedia();
-
           const interval = readInterval();
 	  setInterval(refreshMedia, interval * 1000);
-
-	  setInterval(reloadPage, 60 * 60 * 1000);
       };
     </script>
   </head>
 
   <body>
-
     <div id="container">
       <div id="info">
 	<div id="datetime"></div>
 	<div id="location"></div>
       </div>
     </div>
-
   </body>
 </html>
