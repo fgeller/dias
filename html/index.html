@@ -97,7 +97,7 @@
 
       function refreshMedia() {
 	  const rq = new XMLHttpRequest();
-	  rq.addEventListener("load", loadedCallback(rq));
+	  rq.addEventListener("load", callbackRequestLoaded(rq));
 	  rq.open("GET", "/next");
 	  rq.send();
       }
