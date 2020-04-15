@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"image"
 	"io/ioutil"
@@ -19,12 +20,21 @@ import (
 	"github.com/rwcarlsen/goexif/exif"
 )
 
-var mediaFiles []string
-
 func fail(err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func warn(err error) {
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func random(strs []string) string {
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return strs[rnd.Intn(len(strs))]
 }
 
 type response struct {
@@ -68,18 +78,18 @@ func fixOrientation(img image.Image, orientation string) image.Image {
 	return img
 }
 
-func refreshNextVideo(path string, md metaData) string {
+func (s *server) refreshNextVideo(path string, md metaData) string {
 	buf, err := ioutil.ReadFile(path)
 	fail(err)
 
-	target := filepath.Join("html", "next.mov")
+	target := filepath.Join(s.htmlDir, "next.mov")
 	err = ioutil.WriteFile(target, buf, 0755)
 	fail(err)
 
 	return "/next.mov"
 }
 
-func refreshNextJPG(path string, md metaData) string {
+func (s *server) refreshNextJPG(path string, md metaData) string {
 	f, err := os.Open(path)
 	fail(err)
 
@@ -95,31 +105,31 @@ func refreshNextJPG(path string, md metaData) string {
 		}
 	}
 
-	err = imaging.Save(i, "html/next.jpg")
+	err = imaging.Save(i, filepath.Join(s.htmlDir, "next.jpg"))
 	fail(err)
 
 	return "/next.jpg"
 }
 
-func refreshNextPNG(path string, md metaData) string {
+func (s *server) refreshNextPNG(path string, md metaData) string {
 	f, err := os.Open(path)
 	fail(err)
 
 	i, err := imaging.Decode(f)
 	fail(err)
 
-	err = imaging.Save(i, "html/next.png")
+	err = imaging.Save(i, filepath.Join(s.htmlDir, "next.png"))
 	fail(err)
 
 	return "/next.png"
 }
 
-func refreshNextPhoto(path string, md metaData) string {
+func (s *server) refreshNextPhoto(path string, md metaData) string {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".png":
-		return refreshNextPNG(path, md)
+		return s.refreshNextPNG(path, md)
 	default:
-		return refreshNextJPG(path, md)
+		return s.refreshNextJPG(path, md)
 	}
 }
 
@@ -136,7 +146,6 @@ func isHEIF(path string) bool {
 
 func isVideo(path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
-
 	switch ext {
 	case ".mov":
 		return true
@@ -145,7 +154,7 @@ func isVideo(path string) bool {
 	}
 }
 
-func readVideoMetaData(path string) metaData {
+func (s *server) readVideoMetaData(path string) metaData {
 	result := metaData{}
 
 	f, err := os.Open(path)
@@ -160,7 +169,7 @@ func readVideoMetaData(path string) metaData {
 	return result
 }
 
-func readPhotoMetaData(path string) metaData {
+func (s *server) readPhotoMetaData(path string) metaData {
 	result := metaData{}
 
 	f, err := os.Open(path)
@@ -215,57 +224,95 @@ func readPhotoMetaData(path string) metaData {
 	return result
 }
 
-func Next(w http.ResponseWriter, r *http.Request) {
-	fn := randomString(mediaFiles)
-	pth := fmt.Sprintf("html/media/%v", fn)
-	var resp response
-
-	if isVideo(pth) {
-		resp.Type = "Video"
-		resp.Meta = readVideoMetaData(pth)
-		resp.Path = refreshNextVideo(pth, resp.Meta)
-	} else {
-		resp.Type = "Photo"
-		resp.Meta = readPhotoMetaData(pth)
-		resp.Path = refreshNextPhoto(pth, resp.Meta)
-	}
-
-	enc := json.NewEncoder(w)
-	err := enc.Encode(resp)
-	fail(err)
-}
-
-func randomString(strs []string) string {
-	rnd := rand.New(rand.NewSource(time.Now().Unix()))
-	return strs[rnd.Intn(len(strs))]
-}
-
-func findMedia() ([]string, error) {
+func findMedia(dir string) ([]string, error) {
 	result := []string{}
 	walker := func(pth string, info os.FileInfo, err error) error {
 		switch strings.ToLower(filepath.Ext(info.Name())) {
 		case ".heic", ".jpg", ".jpeg", ".png":
-			result = append(result, info.Name())
-			// case ".mov":
-			// 	result = append(result, info.Name())
-			// TODO png
+			result = append(result, pth)
 		}
 		return err
 	}
-	err := filepath.Walk("html/media", walker)
+	err := filepath.Walk(dir, walker)
+
+	log.Printf("found %v media files in %v, err=%v\n", len(result), dir, err)
 	return result, err
 }
 
+type config struct {
+	HTMLDir  string
+	MediaDir string
+	Addr     string
+}
+
+func readFlags() (config, error) {
+	result := config{}
+	flag.StringVar(&result.HTMLDir, "html-dir", "", "Directory that contains html and will be served")
+	flag.StringVar(&result.MediaDir, "media-dir", "", "Directory that contains media files")
+	flag.StringVar(&result.Addr, "addr", ":8080", "Adress that the server will listen at")
+	flag.Parse()
+
+	if result.HTMLDir == "" {
+		return result, fmt.Errorf("html-dir is required")
+	}
+
+	if result.MediaDir == "" {
+		return result, fmt.Errorf("media-dir is required")
+	}
+
+	return result, nil
+}
+
+type server struct {
+	htmlDir    string
+	addr       string
+	mediaFiles []string
+
+	mux *http.ServeMux
+}
+
+func newServer(addr, htmlDir string, files []string) *server {
+	return &server{
+		addr:       addr,
+		htmlDir:    htmlDir,
+		mediaFiles: files,
+	}
+}
+
+func (s *server) next(w http.ResponseWriter, r *http.Request) {
+	fp := random(s.mediaFiles)
+	var resp response
+
+	if isVideo(fp) {
+		resp.Type = "Video"
+		resp.Meta = s.readVideoMetaData(fp)
+		resp.Path = s.refreshNextVideo(fp, resp.Meta)
+	} else {
+		resp.Type = "Photo"
+		resp.Meta = s.readPhotoMetaData(fp)
+		resp.Path = s.refreshNextPhoto(fp, resp.Meta)
+	}
+
+	err := json.NewEncoder(w).Encode(resp)
+	warn(err)
+}
+
+func (s *server) serve() error {
+	s.mux = http.NewServeMux()
+	s.mux.Handle("/", http.FileServer(http.Dir(s.htmlDir)))
+	s.mux.HandleFunc("/next", s.next)
+
+	log.Printf("starting server at %#v serving %#v", s.addr, s.htmlDir)
+	return http.ListenAndServe(s.addr, s.mux)
+}
+
 func main() {
-	var err error
-	mediaFiles, err = findMedia()
+	cfg, err := readFlags()
 	fail(err)
-	log.Printf("found %v media files.\n", len(mediaFiles))
 
-	http.Handle("/", http.FileServer(http.Dir("html/")))
-	http.HandleFunc("/next", Next)
+	mediaFiles, err := findMedia(cfg.MediaDir)
+	fail(err)
 
-	addr := ":8080"
-	log.Printf("starting server at %#v", addr)
-	log.Fatal(http.ListenAndServe(addr, nil))
+	err = newServer(cfg.Addr, cfg.HTMLDir, mediaFiles).serve()
+	fail(err)
 }

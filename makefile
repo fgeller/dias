@@ -16,4 +16,4 @@ clean:
 	rm -f ${ARTIFACT}-*.txz
 
 run: build
-	./${ARTIFACT}
+	./${ARTIFACT} -html-dir html -media-dir html/media
