@@ -86,7 +86,7 @@ func (s *server) refreshNextVideo(path string, md metaData) string {
 	err = ioutil.WriteFile(target, buf, 0755)
 	fail(err)
 
-	return "/next.mov"
+	return "next.mov"
 }
 
 func (s *server) refreshNextJPG(path string, md metaData) string {
@@ -108,7 +108,7 @@ func (s *server) refreshNextJPG(path string, md metaData) string {
 	err = imaging.Save(i, filepath.Join(s.htmlDir, "next.jpg"))
 	fail(err)
 
-	return "/next.jpg"
+	return "next.jpg"
 }
 
 func (s *server) refreshNextPNG(path string, md metaData) string {
@@ -121,7 +121,7 @@ func (s *server) refreshNextPNG(path string, md metaData) string {
 	err = imaging.Save(i, filepath.Join(s.htmlDir, "next.png"))
 	fail(err)
 
-	return "/next.png"
+	return "next.png"
 }
 
 func (s *server) refreshNextPhoto(path string, md metaData) string {
