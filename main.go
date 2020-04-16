@@ -32,9 +32,9 @@ func warn(err error) {
 	}
 }
 
-func random(strs []string) string {
+func randomize(strs []string) {
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return strs[rnd.Intn(len(strs))]
+	rnd.Shuffle(len(strs), func(i, j int) { tmp := strs[i]; strs[i] = strs[j]; strs[j] = tmp })
 }
 
 type response struct {
@@ -224,21 +224,6 @@ func (s *server) readPhotoMetaData(path string) metaData {
 	return result
 }
 
-func findMedia(dir string) ([]string, error) {
-	result := []string{}
-	walker := func(pth string, info os.FileInfo, err error) error {
-		switch strings.ToLower(filepath.Ext(info.Name())) {
-		case ".heic", ".jpg", ".jpeg", ".png":
-			result = append(result, pth)
-		}
-		return err
-	}
-	err := filepath.Walk(dir, walker)
-
-	log.Printf("found %v media files in %v, err=%v\n", len(result), dir, err)
-	return result, err
-}
-
 type config struct {
 	HTMLDir  string
 	MediaDir string
@@ -265,22 +250,62 @@ func readFlags() (config, error) {
 
 type server struct {
 	htmlDir    string
+	mediaDir   string
 	addr       string
 	mediaFiles []string
 
 	mux *http.ServeMux
 }
 
-func newServer(addr, htmlDir string, files []string) *server {
+func newServer(addr, htmlDir, mediaDir string) *server {
 	return &server{
-		addr:       addr,
-		htmlDir:    htmlDir,
-		mediaFiles: files,
+		addr:     addr,
+		htmlDir:  htmlDir,
+		mediaDir: mediaDir,
 	}
 }
 
+func (s *server) findMedia() ([]string, error) {
+	result := []string{}
+	walker := func(pth string, info os.FileInfo, err error) error {
+		switch strings.ToLower(filepath.Ext(info.Name())) {
+		case ".heic", ".jpg", ".jpeg", ".png":
+			result = append(result, pth)
+		}
+		return err
+	}
+	err := filepath.Walk(s.mediaDir, walker)
+
+	log.Printf("found %v media files in %v, err=%v\n", len(result), s.mediaDir, err)
+	return result, err
+}
+
+func (s *server) refreshMedia() {
+	var err error
+
+	s.mediaFiles, err = s.findMedia()
+	fail(err)
+
+	if len(s.mediaFiles) == 0 {
+		fail(fmt.Errorf("media files are required"))
+	}
+
+	randomize(s.mediaFiles)
+}
+
+func (s *server) takeNextMediaFile() string {
+	if len(s.mediaFiles) == 0 {
+		s.refreshMedia()
+	}
+
+	next := s.mediaFiles[0]
+	s.mediaFiles = s.mediaFiles[1:]
+
+	return next
+}
+
 func (s *server) next(w http.ResponseWriter, r *http.Request) {
-	fp := random(s.mediaFiles)
+	fp := s.takeNextMediaFile()
 	var resp response
 
 	if isVideo(fp) {
@@ -297,7 +322,9 @@ func (s *server) next(w http.ResponseWriter, r *http.Request) {
 	warn(err)
 }
 
-func (s *server) serve() error {
+func (s *server) start() error {
+	s.refreshMedia() // early feedback on missing files
+
 	s.mux = http.NewServeMux()
 	s.mux.Handle("/", http.FileServer(http.Dir(s.htmlDir)))
 	s.mux.HandleFunc("/next", s.next)
@@ -310,9 +337,6 @@ func main() {
 	cfg, err := readFlags()
 	fail(err)
 
-	mediaFiles, err := findMedia(cfg.MediaDir)
-	fail(err)
-
-	err = newServer(cfg.Addr, cfg.HTMLDir, mediaFiles).serve()
+	err = newServer(cfg.Addr, cfg.HTMLDir, cfg.MediaDir).start()
 	fail(err)
 }
