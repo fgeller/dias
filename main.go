@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/disintegration/imaging"
@@ -83,7 +84,9 @@ func (s *server) refreshNextVideo(path string, md metaData) string {
 	fail(err)
 
 	target := filepath.Join(s.htmlDir, "next.mov")
+	s.lock.Lock()
 	err = ioutil.WriteFile(target, buf, 0755)
+	s.lock.Unlock()
 	fail(err)
 
 	return "next.mov"
@@ -254,7 +257,8 @@ type server struct {
 	addr       string
 	mediaFiles []string
 
-	mux *http.ServeMux
+	lock *sync.Mutex
+	mux  *http.ServeMux
 }
 
 func newServer(addr, htmlDir, mediaDir string) *server {
